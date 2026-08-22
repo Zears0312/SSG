@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SGG - Recuperar Contraseña</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header>
+        <h1>SGG - Recuperar Acceso</h1>
+        <button id="theme-toggle" aria-label="Alternar modo claro/oscuro">
+    <img src="img/luna.svg" id="theme-icon" alt="Alternar Tema">
+</button>
+    </header>
+
+    <main>
+        <section class="recovery-container">
+            <h2>Cambiar Contraseña</h2>
+            <form id="recovery-form">
+                <div class="form-group">
+                    <label for="email-recup">Correo Electrónico Registrado:</label>
+                    <input type="email" id="email-recup" name="email-recup" required>
+                </div>
+                
+                <div class="form-group password-group">
+                    <label for="new-password">Nueva Contraseña:</label>
+                    <input type="password" id="new-password" name="new-password" required>
+                    <button type="button" class="toggle-password" aria-controls="new-password" aria-label="Mostrar contraseña">
+                        <img src="img/ver.svg" alt="Ver contraseña" width="24" height="24">
+                    </button>
+                </div>
+
+                <ul id="password-requirements" aria-live="polite">
+                    <li id="req-length" class="req-invalid">Mínimo 8 caracteres</li>
+                    <li id="req-upper" class="req-invalid">Al menos 1 letra Mayúscula</li>
+                    <li id="req-lower" class="req-invalid">Al menos 1 letra Minúscula</li>
+                    <li id="req-num" class="req-invalid">Al menos 1 número</li>
+                    <li id="req-spec" class="req-invalid">Al menos 1 carácter especial</li>
+                </ul>
+
+                <div class="form-group password-group">
+                    <label for="rep-new-password">Repetir Nueva Contraseña:</label>
+                    <input type="password" id="rep-new-password" name="rep-new-password" required>
+                    <button type="button" class="toggle-password" aria-controls="rep-new-password" aria-label="Mostrar contraseña">
+                        <img src="img/ver.svg" alt="Ver contraseña" width="24" height="24">
+                    </button>
+                </div>
+
+                <button type="submit" id="btn-recover" disabled>Actualizar Contraseña</button>
+            </form>
+
+            <nav class="auth-links">
+                <a href="index.html">Volver al Inicio de Sesión</a>
+            </nav>
+        </section>
+    </main>
+
+    <script src="js/theme.js"></script>
+    <script src="js/recuperar.js"></script>
+</body>
+</html>
