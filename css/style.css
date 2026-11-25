@@ -243,3 +243,185 @@ button[type="submit"]:disabled {
 .auth-links a:focus {
     text-decoration: underline;
 }
+
+.dashboard-main {
+    max-width: 900px !important;
+}
+
+.dashboard-header-bar {
+    width: 100%;
+    max-width: 900px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.user-info {
+    font-weight: 600;
+    font-size: 0.95srem;
+}
+
+/* Tarjeta de Resumen (Total) */
+.summary-card {
+    background-color: var(--container-bg);
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    margin-bottom: 25px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-left: 5px solid var(--primary-color);
+}
+
+.summary-card h3 {
+    font-size: 1.1rem;
+    color: var(--text-muted);
+}
+
+.summary-amount {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
+/* Contenedor de Secciones del Panel */
+.panel-section {
+    background-color: var(--container-bg);
+    padding: 25px;
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    margin-bottom: 25px;
+}
+
+.panel-section h3 {
+    margin-bottom: 15px;
+    font-size: 1.4rem;
+}
+
+/* Fila de Formulario Adaptada */
+.form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 15px;
+}
+
+select {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--input-border);
+    border-radius: 6px;
+    background-color: var(--input-bg);
+    color: var(--text-color);
+    font-size: 1rem;
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.btn-secondary-custom {
+    background-color: transparent;
+    border: 1px solid var(--input-border);
+    color: var(--text-color);
+    padding: 12px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+}
+.btn-secondary-custom:hover {
+    background-color: var(--input-border);
+}
+
+/* Tabla de Historial Dinámica */
+.table-responsive {
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    text-align: left;
+}
+
+th, td {
+    padding: 12px 10px;
+    border-bottom: 1px solid var(--input-border);
+}
+
+th {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.btn-action {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: bold;
+    margin-right: 5px;
+}
+
+.btn-edit {
+    background-color: #f59e0b;
+    color: #fff;
+}
+.btn-edit:hover { background-color: #d97706; }
+
+.btn-delete {
+    background-color: var(--error-color);
+    color: #fff;
+}
+.btn-delete:hover { background-color: #b91c1c; }
+
+.empty-state {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 20px;
+}
+
+/* Modal de Baja Lógica */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background-color: var(--container-bg);
+    padding: 30px;
+    border-radius: 10px;
+    max-width: 400px;
+    width: 90%;
+    box-shadow: var(--shadow);
+    text-align: center;
+}
+
+.modal-content p {
+    margin: 15px 0 25px 0;
+    color: var(--text-muted);
+}
+
+.modal-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}
+
+.hidden {
+    display: none !important;
+}

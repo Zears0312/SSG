@@ -23,8 +23,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (usuarioEncontrado) {
             errorDiv.textContent = '';
-            alert('¡Inicio de sesión exitoso! Bienvenido ' + usuarioEncontrado.nombre);
             intentosFallidos = 0;
+            
+            // NUEVO: Guardar sesión activa y redirigir al Dashboard
+            localStorage.setItem('usuario_activo', usuarioEncontrado.email);
+            window.location.href = 'dashboard.html';
 
         } else {
             intentosFallidos++;
