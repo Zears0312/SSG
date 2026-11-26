@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Referencias al DOM del CRUD
     const form = document.getElementById('gasto-form');
     const inputId = document.getElementById('gasto-id');
+    const selectTipo = document.getElementById('tipo-movimiento');
     const inputMonto = document.getElementById('monto');
     const inputFecha = document.getElementById('fecha');
     const selectCategoria = document.getElementById('categoria');
@@ -31,12 +32,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     const totalAmountEl = document.getElementById('total-amount');
     const activeCountEl = document.getElementById('active-count');
 
+    // Referencias al Modal de Baja Lógica
     const deleteModal = document.getElementById('delete-modal');
     const modalBtnCancel = document.getElementById('modal-btn-cancel');
     const modalBtnConfirm = document.getElementById('modal-btn-confirm');
     let idParaEliminar = null;
 
-    function obtenerGastosActivos() {
+    function obtenerMovimientosActivos() {
         const stmt = db.prepare(
             "SELECT * FROM movimientos WHERE email_usuario = ? AND activo = 1 ORDER BY id_movimiento DESC"
         );
@@ -50,43 +52,70 @@ document.addEventListener('DOMContentLoaded', async () => {
         return lista;
     }
 
+    // Renderizar Dashboard y recalcular Balance Acumulado
     function renderizarDashboard() {
-        const misGastosActivos = obtenerGastosActivos();
+        const misMovimientos = obtenerMovimientosActivos();
 
         tbody.innerHTML = '';
-        let sumaTotal = 0;
+        let balance = 0;
 
-        if (misGastosActivos.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="5" class="empty-state">No hay gastos registrados.</td></tr>`;
+        if (misMovimientos.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No hay movimientos registrados.</td></tr>`;
             totalAmountEl.textContent = '$0,00';
+            totalAmountEl.style.color = '';
             activeCountEl.textContent = '0 registros';
             return;
         }
 
-        misGastosActivos.forEach(gasto => {
-            sumaTotal += Number(gasto.monto);
+        misMovimientos.forEach(mov => {
+            const montoNum = Number(mov.monto);
+            const esIngreso = mov.tipo_movimiento === 'ingreso';
+
+            if (esIngreso) {
+                balance += montoNum;
+            } else {
+                balance -= montoNum;
+            }
+
             const tr = document.createElement('tr');
+            const colorMonto = esIngreso ? '#22c55e' : '#ef4444';
+            const signo = esIngreso ? '+' : '-';
+            const textoTipo = esIngreso ? 'Ingreso' : 'Egreso';
+
             tr.innerHTML = `
-                <td>${gasto.fecha}</td>
-                <td>${gasto.categoria}</td>
-                <td>${gasto.descripcion}</td>
-                <td><strong>$ ${Number(gasto.monto).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</strong></td>
+                <td>${mov.fecha}</td>
+                <td>${textoTipo}</td>
+                <td>${mov.categoria}</td>
+                <td>${mov.descripcion}</td>
+                <td style="color: ${colorMonto};"><strong>${signo} $ ${montoNum.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</strong></td>
                 <td>
-                    <button class="btn-action btn-edit" data-id="${gasto.id_movimiento}">Editar</button>
-                    <button class="btn-action btn-delete" data-id="${gasto.id_movimiento}">Eliminar</button>
+                    <button class="btn-action btn-edit" data-id="${mov.id_movimiento}">Editar</button>
+                    <button class="btn-action btn-delete" data-id="${mov.id_movimiento}">Eliminar</button>
                 </td>
             `;
             tbody.appendChild(tr);
         });
 
-        totalAmountEl.textContent = `$ ${sumaTotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
-        activeCountEl.textContent = `${misGastosActivos.length} registro(s) activo(s)`;
+        const prefijo = balance < 0 ? '-$ ' : '$ ';
+        totalAmountEl.textContent = `${prefijo}${Math.abs(balance).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
+
+        if (balance > 0) {
+            totalAmountEl.style.color = '#22c55e';
+        } else if (balance < 0) {
+            totalAmountEl.style.color = '#ef4444';
+        } else {
+            totalAmountEl.style.color = '';
+        }
+
+        activeCountEl.textContent = `${misMovimientos.length} registro(s) activo(s)`;
     }
 
+    // Guardar / Actualizar Movimiento
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         errorDiv.textContent = '';
 
+        const tipo = selectTipo.value;
         const monto = parseFloat(inputMonto.value);
         const fecha = inputFecha.value;
         const categoria = selectCategoria.value;
@@ -101,13 +130,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (idEditando) {
             db.run(
-                "UPDATE movimientos SET monto = ?, fecha = ?, categoria = ?, descripcion = ? WHERE id_movimiento = ? AND email_usuario = ?",
-                [monto, fecha, categoria, descripcion, Number(idEditando), usuarioActivo]
+                "UPDATE movimientos SET tipo_movimiento = ?, monto = ?, fecha = ?, categoria = ?, descripcion = ? WHERE id_movimiento = ? AND email_usuario = ?",
+                [tipo, monto, fecha, categoria, descripcion, Number(idEditando), usuarioActivo]
             );
         } else {
             db.run(
-                "INSERT INTO movimientos (email_usuario, tipo_movimiento, monto, fecha, categoria, descripcion, url_comprobante, activo) VALUES (?, 'egreso', ?, ?, ?, ?, NULL, 1)",
-                [usuarioActivo, monto, fecha, categoria, descripcion]
+                "INSERT INTO movimientos (email_usuario, tipo_movimiento, monto, fecha, categoria, descripcion, url_comprobante, activo) VALUES (?, ?, ?, ?, ?, ?, NULL, 1)",
+                [usuarioActivo, tipo, monto, fecha, categoria, descripcion]
             );
         }
 
@@ -137,15 +166,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             );
             stmt.bind([Number(id), usuarioActivo]);
             if (stmt.step()) {
-                const gasto = stmt.getAsObject();
-                inputId.value = gasto.id_movimiento;
-                inputMonto.value = gasto.monto;
-                inputFecha.value = gasto.fecha;
-                selectCategoria.value = gasto.categoria;
-                inputDescripcion.value = gasto.descripcion;
+                const mov = stmt.getAsObject();
+                inputId.value = mov.id_movimiento;
+                selectTipo.value = mov.tipo_movimiento;
+                inputMonto.value = mov.monto;
+                inputFecha.value = mov.fecha;
+                selectCategoria.value = mov.categoria;
+                inputDescripcion.value = mov.descripcion;
 
-                formTitle.textContent = 'Editar Gasto';
-                btnSave.textContent = 'Actualizar Gasto';
+                formTitle.textContent = 'Editar Movimiento';
+                btnSave.textContent = 'Actualizar Movimiento';
                 btnCancel.classList.remove('hidden');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             }
