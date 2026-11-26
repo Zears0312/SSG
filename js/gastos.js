@@ -42,6 +42,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     let idParaEliminar = null;
     let urlComprobanteActual = null;
 
+    // Instancias de Chart.js (Punto 5)
+    let chartCategoriasInstance = null;
+    let chartBalanceInstance = null;
+
     // Subir imagen a ImgBB usando FormData + fetch + try/catch
     async function subirComprobanteImgBB(archivo) {
         try {
@@ -84,6 +88,100 @@ document.addEventListener('DOMContentLoaded', async () => {
         return lista;
     }
 
+    // Consultas SQL de agregación (GROUP BY / SUM) y renderizado de Chart.js
+    function actualizarGraficos() {
+        const canvasCat = document.getElementById('chart-categorias');
+        const canvasBal = document.getElementById('chart-balance');
+        if (!canvasCat || !canvasBal) return;
+
+        // Consulta 1: Distribución de egresos acumulados por categoría
+        const stmtCat = db.prepare(`
+            SELECT categoria, SUM(monto) AS total 
+            FROM movimientos 
+            WHERE email_usuario = ? AND activo = 1 AND tipo_movimiento = 'egreso'
+            GROUP BY categoria
+            ORDER BY total DESC
+        `);
+        stmtCat.bind([usuarioActivo]);
+
+        const labelsCategorias = [];
+        const datosCategorias = [];
+        while (stmtCat.step()) {
+            const fila = stmtCat.getAsObject();
+            labelsCategorias.push(fila.categoria);
+            datosCategorias.push(Number(fila.total));
+        }
+        stmtCat.free();
+
+        // Consulta 2: Comparativa global de Ingresos vs. Egresos
+        const stmtBal = db.prepare(`
+            SELECT tipo_movimiento, SUM(monto) AS total 
+            FROM movimientos 
+            WHERE email_usuario = ? AND activo = 1
+            GROUP BY tipo_movimiento
+        `);
+        stmtBal.bind([usuarioActivo]);
+
+        let totalIngresos = 0;
+        let totalEgresos = 0;
+        while (stmtBal.step()) {
+            const fila = stmtBal.getAsObject();
+            if (fila.tipo_movimiento === 'ingreso') totalIngresos = Number(fila.total);
+            if (fila.tipo_movimiento === 'egreso') totalEgresos = Number(fila.total);
+        }
+        stmtBal.free();
+
+        // Destruir instancias previas antes de volver a dibujar
+        if (chartCategoriasInstance) chartCategoriasInstance.destroy();
+        if (chartBalanceInstance) chartBalanceInstance.destroy();
+
+        // Gráfico 1: Dona de Egresos por Categoría
+        chartCategoriasInstance = new Chart(canvasCat, {
+            type: 'doughnut',
+            data: {
+                labels: labelsCategorias.length > 0 ? labelsCategorias : ['Sin egresos'],
+                datasets: [{
+                    data: datosCategorias.length > 0 ? datosCategorias : [0],
+                    backgroundColor: [
+                        '#38bdf8', '#f87171', '#fbbf24', '#34d399', '#a78bfa', '#fb923c', '#94a3b8'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom' }
+                }
+            }
+        });
+
+        // Gráfico 2: Barras de Ingresos vs. Egresos
+        chartBalanceInstance = new Chart(canvasBal, {
+            type: 'bar',
+            data: {
+                labels: ['Ingresos', 'Egresos'],
+                datasets: [{
+                    label: 'Monto Acumulado ($)',
+                    data: [totalIngresos, totalEgresos],
+                    backgroundColor: ['#22c55e', '#ef4444'],
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+    }
+
     // Renderizar Dashboard y recalcular Balance Acumulado
     function renderizarDashboard() {
         const misMovimientos = obtenerMovimientosActivos();
@@ -96,6 +194,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             totalAmountEl.textContent = '$0,00';
             totalAmountEl.style.color = '';
             activeCountEl.textContent = '0 registros';
+            actualizarGraficos();
             return;
         }
 
@@ -144,6 +243,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         activeCountEl.textContent = `${misMovimientos.length} registro(s) activo(s)`;
+        actualizarGraficos();
     }
 
     // Guardar / Actualizar Movimiento

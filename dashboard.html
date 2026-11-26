@@ -110,6 +110,25 @@
                 </table>
             </div>
         </section>
+
+        <!-- Módulo de Reportes e Inteligencia de Datos (Punto 5) -->
+        <section class="panel-section">
+            <h3>Reportes e Inteligencia de Datos</h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; margin-top: 15px; align-items: center;">
+                <div>
+                    <h4 style="text-align: center; margin-bottom: 10px;">Egresos por Categoría</h4>
+                    <div style="position: relative; height: 260px; width: 100%;">
+                        <canvas id="chart-categorias"></canvas>
+                    </div>
+                </div>
+                <div>
+                    <h4 style="text-align: center; margin-bottom: 10px;">Ingresos vs. Egresos</h4>
+                    <div style="position: relative; height: 260px; width: 100%;">
+                        <canvas id="chart-balance"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
     </main>
 
     <!-- Modal de Confirmación para Baja Lógica (RF-08) -->
@@ -125,6 +144,7 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="js/db.js"></script>
     <script src="js/theme.js"></script>
     <script src="js/gastos.js"></script>
