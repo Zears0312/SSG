@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', async () => {
     await initDatabase();
-
+    
     const loginForm = document.getElementById('login-form');
     const errorDiv = document.getElementById('login-error');
     const btnLogin = document.getElementById('btn-login');

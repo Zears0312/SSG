@@ -1,13 +1,79 @@
 let db = null;
 const DB_FILENAME = 'sgg.sqlite';
 
-// 1. Inicializar SQLite y cargar desde OPFS si ya existe
+// Credenciales de Supabase Storage
+const SUPABASE_URL = 'https://eehdamftehoqftmldkpv.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_J_RDMDbVjXqkuK30A22XSQ_6gnk1T3d';
+const SUPABASE_BUCKET = 'backups';
+
+// Helper interno para escribir el binario en OPFS
+async function escribirArchivoOPFS(uint8Array) {
+    const root = await navigator.storage.getDirectory();
+    const fileHandle = await root.getFileHandle(DB_FILENAME, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(uint8Array);
+    await writable.close();
+}
+
+// Subir binario .sqlite a Supabase Storage (resiliente si no hay internet)
+async function subirASupabase(uint8Array) {
+    try {
+        const response = await fetch(
+            `${SUPABASE_URL}/storage/v1/object/${SUPABASE_BUCKET}/${DB_FILENAME}`,
+            {
+                method: 'POST',
+                headers: {
+                    'apikey': SUPABASE_KEY,
+                    'Authorization': `Bearer ${SUPABASE_KEY}`,
+                    'Content-Type': 'application/octet-stream',
+                    'x-upsert': 'true'
+                },
+                body: uint8Array
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error(`Error Supabase ${response.status}`);
+        }
+        console.log("Respaldo sgg.sqlite sincronizado en Supabase Storage.");
+    } catch (error) {
+        console.warn("Modo offline o error al subir a Supabase (los datos siguen seguros en OPFS):", error);
+    }
+}
+
+// Descargar binario .sqlite desde Supabase Storage
+async function descargarDeSupabase() {
+    try {
+        const response = await fetch(
+            `${SUPABASE_URL}/storage/v1/object/public/${SUPABASE_BUCKET}/${DB_FILENAME}?t=${Date.now()}`,
+            { cache: 'no-store' }
+        );
+        if (!response.ok) return null;
+
+        const arrayBuffer = await response.arrayBuffer();
+        console.log("Base de datos descargada desde Supabase Storage.");
+        return new Uint8Array(arrayBuffer);
+    } catch (error) {
+        console.warn("Sin conexión a Supabase, usando OPFS local:", error);
+        return null;
+    }
+}
+
+// 1. Inicializar SQLite (Si hay internet baja última versión de Supabase -> si no, lee OPFS local -> si no existe, crea nueva)
 async function initDatabase() {
     if (db) return db;
 
     const SQL = await initSqlJs({
         locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/${file}`
     });
+
+    const remoto = await descargarDeSupabase();
+    if (remoto) {
+        db = new SQL.Database(remoto);
+        await escribirArchivoOPFS(remoto);
+        console.log("OPFS actualizado con el respaldo de Supabase.");
+        return db;
+    }
 
     try {
         const root = await navigator.storage.getDirectory();
@@ -16,7 +82,7 @@ async function initDatabase() {
         const arrayBuffer = await file.arrayBuffer();
 
         db = new SQL.Database(new Uint8Array(arrayBuffer));
-        console.log("Base de datos cargada desde OPFS.");
+        console.log("Base de datos cargada desde OPFS local.");
     } catch (error) {
         console.log("Creando nueva base de datos SQLite en OPFS...");
         db = new SQL.Database();
@@ -58,14 +124,11 @@ function crearTablas() {
     `);
 }
 
-// 3. Persistir el binario .sqlite en OPFS
+// 3. Persistir el binario .sqlite en OPFS y respaldar en Supabase
 async function guardarEnOPFS() {
     if (!db) return;
     const data = db.export();
-    const root = await navigator.storage.getDirectory();
-    const fileHandle = await root.getFileHandle(DB_FILENAME, { create: true });
-    const writable = await fileHandle.createWritable();
-    await writable.write(data);
-    await writable.close();
+    await escribirArchivoOPFS(data);
     console.log("Archivo sgg.sqlite guardado en OPFS.");
+    await subirASupabase(data);
 }
