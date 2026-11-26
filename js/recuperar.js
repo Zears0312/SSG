@@ -1,14 +1,18 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    await initDatabase();
+
     const recoveryForm = document.getElementById('recovery-form');
     const btnRecover = document.getElementById('btn-recover');
     const newPasswordInput = document.getElementById('new-password');
 
     const rules = {
-        length: /.{8,}/, upper: /[A-Z]/, lower: /[a-z]/, num: /[0-9]/,
+        length: /.{8,}/,
+        upper: /[A-Z]/,
+        lower: /[a-z]/,
+        num: /[0-9]/,
         spec: /[!@#\$%\^&\*\(\)_\+\-\=\[\]\{\};':"\\|,.<>\/?]/
     };
 
-    // Mismo feedback visual en tiempo real que en registro
     newPasswordInput.addEventListener('input', () => {
         const val = newPasswordInput.value;
         let allValid = true;
@@ -23,16 +27,18 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
-        updateReq('req-length', rules.length); updateReq('req-upper', rules.upper);
-        updateReq('req-lower', rules.lower); updateReq('req-num', rules.num);
+        updateReq('req-length', rules.length);
+        updateReq('req-upper', rules.upper);
+        updateReq('req-lower', rules.lower);
+        updateReq('req-num', rules.num);
         updateReq('req-spec', rules.spec);
-        
+
         btnRecover.disabled = !allValid;
     });
 
-    recoveryForm.addEventListener('submit', (e) => {
+    recoveryForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        
+
         const email = document.getElementById('email-recup').value.trim();
         const nuevaClave = newPasswordInput.value;
         const repNuevaClave = document.getElementById('rep-new-password').value;
@@ -42,23 +48,26 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        let usuarios = JSON.parse(localStorage.getItem('usuarios_sgg')) || [];
-        const indexUsuario = usuarios.findIndex(u => u.email === email);
+        const stmt = db.prepare("SELECT password FROM usuarios WHERE email = ?");
+        stmt.bind([email]);
 
-        if (indexUsuario === -1) {
+        if (!stmt.step()) {
+            stmt.free();
             alert('El correo ingresado no se encuentra registrado.');
             return;
         }
 
-        // Regla: No repetir contraseña actual
-        if (usuarios[indexUsuario].password === nuevaClave) {
+        const usuario = stmt.getAsObject();
+        stmt.free();
+
+        if (usuario.password === nuevaClave) {
             alert('La nueva contraseña no puede ser igual a la actual.');
             return;
         }
 
-        // Actualizar y guardar
-        usuarios[indexUsuario].password = nuevaClave;
-        localStorage.setItem('usuarios_sgg', JSON.stringify(usuarios));
+        db.run("UPDATE usuarios SET password = ? WHERE email = ?", [nuevaClave, email]);
+        await guardarEnOPFS();
+
         alert('Contraseña actualizada con éxito.');
         window.location.href = 'index.html';
     });

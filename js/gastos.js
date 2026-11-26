@@ -1,16 +1,17 @@
-document.addEventListener('DOMContentLoaded', () => {
-    // 1. Validar sesión activa (Seguridad de ruta)
-    const usuarioActivo = localStorage.getItem('usuario_activo');
+document.addEventListener('DOMContentLoaded', async () => {
+    // 1. Validar sesión activa
+    const usuarioActivo = sessionStorage.getItem('usuario_activo');
     if (!usuarioActivo) {
         window.location.href = 'index.html';
         return;
     }
 
+    await initDatabase();
+
     document.getElementById('user-display').textContent = `Usuario conectado: ${usuarioActivo}`;
 
-    // Botón Cerrar Sesión
     document.getElementById('btn-logout').addEventListener('click', () => {
-        localStorage.removeItem('usuario_activo');
+        sessionStorage.removeItem('usuario_activo');
         window.location.href = 'index.html';
     });
 
@@ -30,26 +31,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const totalAmountEl = document.getElementById('total-amount');
     const activeCountEl = document.getElementById('active-count');
 
-    // Referencias al Modal de Baja Lógica
     const deleteModal = document.getElementById('delete-modal');
     const modalBtnCancel = document.getElementById('modal-btn-cancel');
     const modalBtnConfirm = document.getElementById('modal-btn-confirm');
     let idParaEliminar = null;
 
-    // Obtener gastos de localStorage
-    function obtenerGastos() {
-        return JSON.parse(localStorage.getItem('gastos_sgg')) || [];
+    function obtenerGastosActivos() {
+        const stmt = db.prepare(
+            "SELECT * FROM movimientos WHERE email_usuario = ? AND activo = 1 ORDER BY id_movimiento DESC"
+        );
+        stmt.bind([usuarioActivo]);
+
+        const lista = [];
+        while (stmt.step()) {
+            lista.push(stmt.getAsObject());
+        }
+        stmt.free();
+        return lista;
     }
 
-    function guardarGastos(gastos) {
-        localStorage.setItem('gastos_sgg', JSON.stringify(gastos));
-    }
-
-    // Renderizar Dashboard (RF-06 y RF-09)
     function renderizarDashboard() {
-        const todosLosGastos = obtenerGastos();
-        // Filtrar solo los gastos del usuario actual que estén activos (estado_activo !== false)
-        const misGastosActivos = todosLosGastos.filter(g => g.email === usuarioActivo && g.estado_activo !== false);
+        const misGastosActivos = obtenerGastosActivos();
 
         tbody.innerHTML = '';
         let sumaTotal = 0;
@@ -70,8 +72,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${gasto.descripcion}</td>
                 <td><strong>$ ${Number(gasto.monto).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</strong></td>
                 <td>
-                    <button class="btn-action btn-edit" data-id="${gasto.id}">Editar</button>
-                    <button class="btn-action btn-delete" data-id="${gasto.id}">Eliminar</button>
+                    <button class="btn-action btn-edit" data-id="${gasto.id_movimiento}">Editar</button>
+                    <button class="btn-action btn-delete" data-id="${gasto.id_movimiento}">Eliminar</button>
                 </td>
             `;
             tbody.appendChild(tr);
@@ -81,8 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
         activeCountEl.textContent = `${misGastosActivos.length} registro(s) activo(s)`;
     }
 
-    // Guardar / Actualizar Gasto (RF-05 y RF-07)
-    form.addEventListener('submit', (e) => {
+    form.addEventListener('submit', async (e) => {
         e.preventDefault();
         errorDiv.textContent = '';
 
@@ -98,35 +99,20 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const gastos = obtenerGastos();
-
         if (idEditando) {
-            // Actualizar (UPDATE - RF-07)
-            const index = gastos.findIndex(g => g.id == idEditando && g.email === usuarioActivo);
-            if (index !== -1) {
-                gastos[index].monto = monto;
-                gastos[index].fecha = fecha;
-                gastos[index].categoria = categoria;
-                gastos[index].descripcion = descripcion;
-                guardarGastos(gastos);
-            }
-            limpiarFormulario();
+            db.run(
+                "UPDATE movimientos SET monto = ?, fecha = ?, categoria = ?, descripcion = ? WHERE id_movimiento = ? AND email_usuario = ?",
+                [monto, fecha, categoria, descripcion, Number(idEditando), usuarioActivo]
+            );
         } else {
-            // Crear nuevo gasto (CREATE - RF-05)
-            const nuevoGasto = {
-                id: Date.now(),
-                email: usuarioActivo, // Relación con el usuario logueado
-                monto: monto,
-                fecha: fecha,
-                categoria: categoria,
-                descripcion: descripcion,
-                estado_activo: true // Nace activo
-            };
-            gastos.push(nuevoGasto);
-            guardarGastos(gastos);
-            limpiarFormulario();
+            db.run(
+                "INSERT INTO movimientos (email_usuario, tipo_movimiento, monto, fecha, categoria, descripcion, url_comprobante, activo) VALUES (?, 'egreso', ?, ?, ?, ?, NULL, 1)",
+                [usuarioActivo, monto, fecha, categoria, descripcion]
+            );
         }
 
+        await guardarEnOPFS();
+        limpiarFormulario();
         renderizarDashboard();
     });
 
@@ -141,18 +127,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     btnCancel.addEventListener('click', limpiarFormulario);
 
-    // Manejo de clicks en tabla (Editar / Baja lógica)
     tbody.addEventListener('click', (e) => {
         const id = e.target.dataset.id;
         if (!id) return;
 
-        const gastos = obtenerGastos();
-
         if (e.target.classList.contains('btn-edit')) {
-            // Cargar datos para editar
-            const gasto = gastos.find(g => g.id == id && g.email === usuarioActivo);
-            if (gasto) {
-                inputId.value = gasto.id;
+            const stmt = db.prepare(
+                "SELECT * FROM movimientos WHERE id_movimiento = ? AND email_usuario = ? AND activo = 1"
+            );
+            stmt.bind([Number(id), usuarioActivo]);
+            if (stmt.step()) {
+                const gasto = stmt.getAsObject();
+                inputId.value = gasto.id_movimiento;
                 inputMonto.value = gasto.monto;
                 inputFecha.value = gasto.fecha;
                 selectCategoria.value = gasto.categoria;
@@ -163,22 +149,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 btnCancel.classList.remove('hidden');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             }
+            stmt.free();
         } else if (e.target.classList.contains('btn-delete')) {
-            // Abrir modal de baja lógica (RF-08)
-            idParaEliminar = id;
+            idParaEliminar = Number(id);
             deleteModal.classList.remove('hidden');
         }
     });
 
-    // Confirmar Baja Lógica (RF-08)
-    modalBtnConfirm.addEventListener('click', () => {
+    modalBtnConfirm.addEventListener('click', async () => {
         if (idParaEliminar) {
-            let gastos = obtenerGastos();
-            const index = gastos.findIndex(g => g.id == idParaEliminar && g.email === usuarioActivo);
-            if (index !== -1) {
-                gastos[index].estado_activo = false;
-                guardarGastos(gastos);
-            }
+            db.run(
+                "UPDATE movimientos SET activo = 0 WHERE id_movimiento = ? AND email_usuario = ?",
+                [idParaEliminar, usuarioActivo]
+            );
+            await guardarEnOPFS();
             deleteModal.classList.add('hidden');
             idParaEliminar = null;
             limpiarFormulario();
@@ -191,6 +175,5 @@ document.addEventListener('DOMContentLoaded', () => {
         idParaEliminar = null;
     });
 
-    // Cargar historial al iniciar
     renderizarDashboard();
 });

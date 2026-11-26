@@ -1,9 +1,10 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    await initDatabase();
+
     const registerForm = document.getElementById('register-form');
     const btnRegister = document.getElementById('btn-register');
     const passwordInput = document.getElementById('password-reg');
-    
-    // Reglas de Expresión Regular para Contraseña
+
     const rules = {
         length: /.{8,}/,
         upper: /[A-Z]/,
@@ -12,7 +13,6 @@ document.addEventListener('DOMContentLoaded', () => {
         spec: /[!@#\$%\^&\*\(\)_\+\-\=\[\]\{\};':"\\|,.<>\/?]/
     };
 
-    // Feedback visual en tiempo real
     passwordInput.addEventListener('input', () => {
         const val = passwordInput.value;
         let allValid = true;
@@ -36,10 +36,9 @@ document.addEventListener('DOMContentLoaded', () => {
         btnRegister.disabled = !allValid;
     });
 
-    // Envío del formulario
-    registerForm.addEventListener('submit', (e) => {
+    registerForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        
+
         const nombre = document.getElementById('nombre').value.trim();
         const apellido = document.getElementById('apellido').value.trim();
         const fechaNac = document.getElementById('fecha-nac').value;
@@ -47,40 +46,49 @@ document.addEventListener('DOMContentLoaded', () => {
         const password = passwordInput.value;
         const passwordRep = document.getElementById('password-rep').value;
 
-        // 1. Validar Edad Crítica (> 14 años)
+        // 1. Validar Edad (> 14 años)
         const hoy = new Date();
         const nacimiento = new Date(fechaNac);
         let edad = hoy.getFullYear() - nacimiento.getFullYear();
         const m = hoy.getMonth() - nacimiento.getMonth();
         if (m < 0 || (m === 0 && hoy.getDate() < nacimiento.getDate())) { edad--; }
-        
+
         if (edad < 14) {
             alert('Debes tener más de 14 años para registrarte.');
             return;
         }
 
-        // 2. Restricciones de Email Estricto
+        // 2. Validar Email
         const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
         if (!emailRegex.test(email)) {
             alert('El formato del correo no es válido.');
             return;
         }
 
-        // 3. Confirmación Doble Match
+        // 3. Confirmar contraseñas
         if (password !== passwordRep) {
             alert('Las contraseñas no coinciden.');
             return;
         }
 
-        // 4. Guardar en LocalStorage si no existe el email
-        let usuarios = JSON.parse(localStorage.getItem('usuarios_sgg')) || [];
-        if (usuarios.some(u => u.email === email)) {
+        // 4. Verificar si el email ya existe en SQLite
+        const stmt = db.prepare("SELECT id_usuario FROM usuarios WHERE email = ?");
+        stmt.bind([email]);
+        const existe = stmt.step();
+        stmt.free();
+
+        if (existe) {
             alert('Este correo electrónico ya se encuentra registrado.');
             return;
         }
 
-        usuarios.push({ email, password, nombre, apellido });
-        localStorage.setItem('usuarios_sgg', JSON.stringify(usuarios));
+        // 5. Insertar en SQLite y guardar en OPFS
+        db.run(
+            "INSERT INTO usuarios (nombre, apellido, fecha_nacimiento, email, password) VALUES (?, ?, ?, ?, ?)",
+            [nombre, apellido, fechaNac, email, password]
+        );
+        await guardarEnOPFS();
+
         alert('Usuario registrado con éxito. Serás redirigido al login.');
         window.location.href = 'index.html';
     });
