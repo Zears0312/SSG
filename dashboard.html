@@ -74,6 +74,11 @@
                     <input type="text" id="descripcion" name="descripcion" required maxlength="100" placeholder="Ej: Compra en supermercado">
                 </div>
 
+                <div class="form-group" style="margin-top: 15px;">
+                    <label for="comprobante">Comprobante (Opcional - Imagen):</label>
+                    <input type="file" id="comprobante" name="comprobante" accept="image/*">
+                </div>
+
                 <div id="form-error" class="error-message" style="margin-top: 10px;"></div>
 
                 <div class="form-actions">
@@ -94,6 +99,7 @@
                             <th>Tipo</th>
                             <th>Categoría</th>
                             <th>Descripción</th>
+                            <th>Comprobante</th>
                             <th>Monto</th>
                             <th>Acciones</th>
                         </tr>
